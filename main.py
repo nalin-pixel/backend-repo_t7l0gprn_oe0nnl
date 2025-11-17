@@ -1,8 +1,14 @@
 import os
-from fastapi import FastAPI
+import random
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
 
-app = FastAPI()
+from database import create_document, get_documents, db
+from schemas import Task as TaskSchema, Note as NoteSchema
+
+app = FastAPI(title="MentorAI Backend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,11 +20,11 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI Backend!"}
+    return {"message": "MentorAI API is running"}
 
 @app.get("/api/hello")
 def hello():
-    return {"message": "Hello from the backend API!"}
+    return {"message": "Hello from MentorAI backend"}
 
 @app.get("/test")
 def test_database():
@@ -31,39 +37,73 @@ def test_database():
         "connection_status": "Not Connected",
         "collections": []
     }
-    
     try:
-        # Try to import database module
-        from database import db
-        
         if db is not None:
             response["database"] = "✅ Available"
             response["database_url"] = "✅ Configured"
-            response["database_name"] = db.name if hasattr(db, 'name') else "✅ Connected"
+            response["database_name"] = getattr(db, 'name', "✅ Connected")
             response["connection_status"] = "Connected"
-            
-            # Try to list collections to verify connectivity
             try:
                 collections = db.list_collection_names()
-                response["collections"] = collections[:10]  # Show first 10 collections
+                response["collections"] = collections[:10]
                 response["database"] = "✅ Connected & Working"
             except Exception as e:
                 response["database"] = f"⚠️  Connected but Error: {str(e)[:50]}"
         else:
             response["database"] = "⚠️  Available but not initialized"
-            
-    except ImportError:
-        response["database"] = "❌ Database module not found (run enable-database first)"
     except Exception as e:
         response["database"] = f"❌ Error: {str(e)[:50]}"
-    
-    # Check environment variables
-    import os
+
     response["database_url"] = "✅ Set" if os.getenv("DATABASE_URL") else "❌ Not Set"
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
-    
     return response
 
+# -------------------- Motivation --------------------
+MOTIVATION_POOL = [
+    ("Ogni giorno è una nuova opportunità per diventare la versione migliore di te.", "MentorAI"),
+    ("Fai oggi ciò che altri non vogliono, domani vivrai come altri non possono.", "Anonimo"),
+    ("La disciplina batte la motivazione.", "MentorAI"),
+    ("Picchi piccoli, costanza grande: il progresso è la somma di passi minuscoli.", "MentorAI"),
+    ("Il successo è l’abitudine di fare bene le piccole cose.", "MentorAI"),
+]
+
+class MotivationOut(BaseModel):
+    text: str
+    author: Optional[str] = None
+
+@app.get("/api/motivation", response_model=MotivationOut)
+def get_motivation():
+    text, author = random.choice(MOTIVATION_POOL)
+    return {"text": text, "author": author}
+
+# -------------------- Tasks --------------------
+@app.post("/api/tasks")
+def create_task(task: TaskSchema):
+    inserted_id = create_document("task", task)
+    return {"ok": True, "id": inserted_id}
+
+@app.get("/api/tasks")
+def list_tasks(limit: int = Query(20, ge=1, le=200)):
+    docs = get_documents("task", {}, limit)
+    # Convert ObjectId to string for frontend safety
+    for d in docs:
+        if "_id" in d:
+            d["id"] = str(d.pop("_id"))
+    return {"items": docs}
+
+# -------------------- Notes --------------------
+@app.post("/api/notes")
+def create_note(note: NoteSchema):
+    inserted_id = create_document("note", note)
+    return {"ok": True, "id": inserted_id}
+
+@app.get("/api/notes")
+def list_notes(limit: int = Query(20, ge=1, le=200)):
+    docs = get_documents("note", {}, limit)
+    for d in docs:
+        if "_id" in d:
+            d["id"] = str(d.pop("_id"))
+    return {"items": docs}
 
 if __name__ == "__main__":
     import uvicorn

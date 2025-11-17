@@ -1,48 +1,54 @@
 """
-Database Schemas
+Database Schemas for MentorAI
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model maps to a MongoDB collection with the lowercase class name.
+Examples:
+- UserProfile -> "userprofile"
+- Task -> "task"
+- Note -> "note"
 """
-
+from typing import Optional, List
 from pydantic import BaseModel, Field
-from typing import Optional
+from datetime import datetime
 
-# Example schemas (replace with your own):
-
-class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
+class UserProfile(BaseModel):
     name: str = Field(..., description="Full name")
     email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    avatar_url: Optional[str] = Field(None, description="Profile image URL")
+    timezone: Optional[str] = Field(None, description="Preferred timezone e.g. Europe/Rome")
+    focus_style: Optional[str] = Field(None, description="User focus preference: pomodoro, deepwork, flow")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Task(BaseModel):
+    title: str = Field(..., description="Task title")
+    description: Optional[str] = Field(None, description="Task details")
+    due_date: Optional[datetime] = Field(None, description="Due date/time")
+    priority: Optional[str] = Field("medium", description="low | medium | high")
+    status: str = Field("todo", description="todo | doing | done")
+    tags: List[str] = Field(default_factory=list, description="Labels for filtering")
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Note(BaseModel):
+    title: str = Field(..., description="Note title")
+    content: str = Field(..., description="Raw note content")
+    source: Optional[str] = Field(None, description="Where the note came from: lecture, book, idea")
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class StudySession(BaseModel):
+    mode: str = Field("pomodoro", description="pomodoro | deep | custom")
+    duration_min: int = Field(25, ge=1, le=240, description="Minutes planned")
+    topic: Optional[str] = Field(None, description="What are you focusing on")
+    completed: bool = Field(False, description="Whether session completed")
+
+class Goal(BaseModel):
+    title: str = Field(..., description="Goal name")
+    description: Optional[str] = Field(None, description="Why it matters")
+    target_date: Optional[datetime] = Field(None, description="Target date")
+    progress: int = Field(0, ge=0, le=100, description="Progress percent")
+
+class CreativeDraft(BaseModel):
+    kind: str = Field("text", description="text | poem | lyrics | concept")
+    title: Optional[str] = Field(None)
+    body: str = Field("", description="Draft body text")
+    tags: List[str] = Field(default_factory=list)
+
+class Motivation(BaseModel):
+    text: str = Field(..., description="Motivational quote text")
+    author: Optional[str] = Field(None, description="Author if known")
